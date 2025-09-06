@@ -1,0 +1,491 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🧠 Generador Avanzado de Exámenes</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>🧠 Generador Avanzado de Exámenes</h1>
+    <p>Sube un archivo (.txt, .pdf o .docx) y genera un examen interactivo.</p>
+
+    <input type="file" id="fileInput" accept=".txt,.pdf,.docx" />
+    
+    <div class="options">
+      <label><input type="checkbox" id="mcqCheck" checked> Opción múltiple</label>
+      <label><input type="checkbox" id="tfCheck" checked> Verdadero/Falso</label>
+      <label><input type="checkbox" id="shortCheck" checked> Respuesta corta</label>
+    </div>
+
+    <button id="generateBtn" disabled>Generar Examen</button>
+    <button id="exportBtn" style="display:none;">Exportar como PDF</button>
+
+    <div id="examContainer" class="exam-container"></div>
+  </div>
+
+  <!-- Librerías externas -->
+  <script src="lib/pdf.min.js"></script>
+  <script src="lib/pdf.worker.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+  </script>
+  <script src="lib/mammoth.browser.min.js"></script>
+  <script src="lib/html2pdf.bundle.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html><style>* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f0f2f5;
+  color: #2c3e50;
+  line-height: 1.7;
+}
+
+.container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+h1 {
+  color: #2980b9;
+  margin-bottom: 15px;
+}
+
+p {
+  color: #7f8c8d;
+  margin-bottom: 25px;
+}
+
+#fileInput {
+  margin-bottom: 20px;
+}
+
+.options {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.options label {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #34495e;
+}
+
+button {
+  padding: 12px 24px;
+  font-size: 16px;
+  margin: 10px 5px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+button#generateBtn {
+  background-color: #3498db;
+  color: white;
+}
+
+button#generateBtn:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+button#exportBtn {
+  background-color: #27ae60;
+  color: white;
+}
+
+button#exportBtn:hover {
+  background-color: #219a52;
+}
+
+button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.exam-container {
+  margin-top: 30px;
+  padding: 25px;
+  background-color: #ecf0f1;
+  border-radius: 10px;
+  min-height: 150px;
+}
+
+.exam-container h2 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 20px;
+}
+
+.question {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  border-left: 5px solid #3498db;
+}
+
+.question h3 {
+  margin-bottom: 12px;
+  color: #2c3e50;
+}
+
+.options, .short-answer {
+  margin-top: 10px;
+}
+
+.options li {
+  padding: 10px;
+  margin: 6px 0;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.options li:hover {
+  background-color: #e0f7fa;
+}
+
+.options li.selected {
+  background-color: #bbdefb;
+  border-color: #2196f3;
+  font-weight: bold;
+}
+
+.options li.correct {
+  background-color: #c8e6c9;
+  border-color: #4caf50;
+}
+
+.options li.incorrect {
+  background-color: #ffcdd2;
+  border-color: #f44336;
+}
+
+.short-answer input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.feedback {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.btn-submit {
+  margin-top: 15px;
+  background-color: #e74c3c;
+  color: white;
+  padding: 8px 16px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.result {
+  text-align: center;
+  font-size: 18px;
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #d4edda;
+  color: #155724;
+  border-radius: 8px;
+}</style><script>const fileInput = document.getElementById('fileInput');
+const generateBtn = document.getElementById('generateBtn');
+const exportBtn = document.getElementById('exportBtn');
+const examContainer = document.getElementById('examContainer');
+
+const mcqCheck = document.getElementById('mcqCheck');
+const tfCheck = document.getElementById('tfCheck');
+const shortCheck = document.getElementById('shortCheck');
+
+let fullText = '';
+
+fileInput.addEventListener('change', () => {
+  generateBtn.disabled = fileInput.files.length === 0;
+});
+
+generateBtn.addEventListener('click', async () => {
+  const file = fileInput.files[0];
+  examContainer.innerHTML = '<p>Procesando archivo...</p>';
+
+  try {
+    if (file.type === 'application/pdf') {
+      fullText = await extractTextFromPDF(file);
+    } 
+    else if (file.name.endsWith('.docx')) {
+      fullText = await extractTextFromDocx(file);
+    } 
+    else {
+      fullText = await readFileAsText(file);
+    }
+
+    if (fullText.trim().length < 50) {
+      examContainer.innerHTML = '<p>El archivo está vacío o no tiene suficiente texto.</p>';
+      return;
+    }
+
+    const exam = generateExam(fullText);
+    displayInteractiveExam(exam);
+    exportBtn.style.display = 'inline-block';
+  } catch (error) {
+    examContainer.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+  }
+});
+
+exportBtn.addEventListener('click', () => {
+  const opt = {
+    margin: 1,
+    filename: 'examen_generado.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+  html2pdf().from(examContainer).set(opt).save();
+});
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.readAsText(file);
+  });
+}
+
+async function extractTextFromPDF(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({  arrayBuffer }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    text += ' ' + pageText;
+  }
+  return text;
+}
+
+async function extractTextFromDocx(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const arrayBuffer = e.target.result;
+      mammoth
+        .extractText({ arrayBuffer: arrayBuffer })
+        .then(result => resolve(result.text))
+        .catch(reject);
+    };
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo .docx"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function generateExam(text) {
+  const sentences = text
+    .split(/[.!?]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 20);
+
+  const words = text.split(/\s+/).filter(w => w.length > 4);
+  const keyTerms = [...new Set(words)].slice(0, 20);
+
+  const questions = [];
+  const numQuestions = Math.min(6, sentences.length);
+
+  for (let i = 0; i < numQuestions; i++) {
+    const sentence = sentences[i];
+    const types = [];
+    if (mcqCheck.checked) types.push('mcq');
+    if (tfCheck.checked) types.push('tf');
+    if (shortCheck.checked) types.push('short');
+
+    if (types.length === 0) types.push('mcq');
+
+    const type = types[Math.floor(Math.random() * types.length)];
+
+    if (type === 'mcq') {
+      const keyword = words[Math.floor(Math.random() * words.length)] || 'palabra';
+      const options = [
+        keyword,
+        keyTerms[Math.floor(Math.random() * keyTerms.length)] || 'Opción 1',
+        keyTerms[Math.floor(Math.random() * keyTerms.length)] || 'Opción 2',
+        keyTerms[Math.floor(Math.random() * keyTerms.length)] || 'Opción 3'
+      ].sort(() => 0.5 - Math.random());
+
+      questions.push({
+        type: 'mcq',
+        question: `¿Qué palabra completa mejor: "${sentence.replace(/\b\w{4,}\b/, '__________')}"?`,
+        options,
+        correct: keyword
+      });
+    }
+
+    else if (type === 'tf') {
+      const isTrue = Math.random() < 0.7;
+      const statement = isTrue ? sentence : `Falso: ${sentence.split(' ').reverse().join(' ')}`;
+      questions.push({
+        type: 'tf',
+        question: statement,
+        correct: isTrue
+      });
+    }
+
+    else if (type === 'short') {
+      const blanks = sentence.split(' ');
+      const idx = Math.floor(Math.random() * blanks.length);
+      const answer = blanks[idx];
+      const prompt = blanks.map((w, i) => i === idx ? '__________' : w).join(' ');
+
+      questions.push({
+        type: 'short',
+        question: `Complete: "${prompt}"`,
+        correct: answer
+      });
+    }
+  }
+
+  return questions;
+}
+
+function displayInteractiveExam(questions) {
+  examContainer.innerHTML = '';
+  const title = document.createElement('h2');
+  title.textContent = '📝 Examen Interactivo';
+  examContainer.appendChild(title);
+
+  questions.forEach((q, index) => {
+    const qDiv = document.createElement('div');
+    qDiv.className = 'question';
+
+    const h3 = document.createElement('h3');
+    h3.textContent = `${index + 1}. ${q.question}`;
+    qDiv.appendChild(h3);
+
+    if (q.type === 'mcq') {
+      const list = document.createElement('ul');
+      list.className = 'options';
+      q.options.forEach(option => {
+        const li = document.createElement('li');
+        li.textContent = option;
+        li.dataset.correct = option === q.correct;
+        li.addEventListener('click', () => {
+          list.querySelectorAll('li').forEach(el => el.classList.remove('selected'));
+          li.classList.add('selected');
+        });
+        list.appendChild(li);
+      });
+      qDiv.appendChild(list);
+    }
+
+    else if (q.type === 'tf') {
+      const list = document.createElement('ul');
+      list.className = 'options';
+      ['Verdadero', 'Falso'].forEach(opt => {
+        const li = document.createElement('li');
+        li.textContent = opt;
+        li.dataset.correct = (opt === 'Verdadero') === q.correct;
+        li.addEventListener('click', () => {
+          list.querySelectorAll('li').forEach(el => el.classList.remove('selected'));
+          li.classList.add('selected');
+        });
+        list.appendChild(li);
+      });
+      qDiv.appendChild(list);
+    }
+
+    else if (q.type === 'short') {
+      const shortDiv = document.createElement('div');
+      shortDiv.className = 'short-answer';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Escribe tu respuesta aquí...';
+      input.dataset.correct = q.correct;
+      shortDiv.appendChild(input);
+
+      const btn = document.createElement('button');
+      btn.textContent = 'Verificar';
+      btn.className = 'btn-submit';
+      btn.onclick = () => {
+        const userAnswer = input.value.trim().toLowerCase();
+        const correctAnswer = q.correct.toLowerCase();
+        const feedback = document.createElement('div');
+        feedback.className = 'feedback';
+        if (userAnswer === correctAnswer) {
+          feedback.textContent = '✅ Correcto';
+          feedback.style.color = 'green';
+        } else {
+          feedback.textContent = `❌ Incorrecto. Respuesta correcta: "${q.correct}"`;
+          feedback.style.color = 'red';
+        }
+        if (input.nextSibling) input.parentNode.removeChild(input.nextSibling);
+        shortDiv.appendChild(feedback);
+      };
+      shortDiv.appendChild(btn);
+      qDiv.appendChild(shortDiv);
+    }
+
+    examContainer.appendChild(qDiv);
+  });
+
+  const gradeBtn = document.createElement('button');
+  gradeBtn.textContent = 'Calificar Examen';
+  gradeBtn.style.marginTop = '20px';
+  gradeBtn.onclick = () => gradeExam(questions);
+  examContainer.appendChild(gradeBtn);
+
+  const resultDiv = document.createElement('div');
+  resultDiv.className = 'result';
+  resultDiv.id = 'result';
+  examContainer.appendChild(resultDiv);
+}
+
+function gradeExam(questions) {
+  let correct = 0;
+  document.querySelectorAll('.question').forEach((qDiv, index) => {
+    const q = questions[index];
+    if (q.type === 'mcq' || q.type === 'tf') {
+      const selected = qDiv.querySelector('.options li.selected');
+      if (selected && selected.dataset.correct === 'true') {
+        correct++;
+        selected.classList.add('correct');
+      } else if (selected) {
+        selected.classList.add('incorrect');
+      }
+      qDiv.querySelectorAll('.options li').forEach(li => {
+        if (li.dataset.correct === 'true') li.classList.add('correct');
+      });
+    }
+  });
+
+  const resultDiv = document.getElementById('result');
+  resultDiv.style.display = 'block';
+  resultDiv.textContent = `Has acertado ${correct} de ${questions.length} preguntas.`;
+}</script>
